@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import re
 from nxc.helpers.misc import CATEGORY
+from nxc.helpers.filenames import sanitize_path_component
 from nxc.paths import NXC_PATH
 
 
@@ -139,7 +140,8 @@ class NXCModule:
                         context.log.fail(f"Regex scan failed for {db_name}.{table_name}: {e}")
 
         if self.save and all_results:
-            filename = f"{connection.hostname}_{connection.host}_{datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S')}.json"
+            safe_hostname = sanitize_path_component(connection.hostname)
+            filename = f"{safe_hostname}_{connection.host}_{datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S')}.json"
             file_path = Path(f"{NXC_PATH}/modules/mssql-dumper/{filename}").resolve()
             os.makedirs(file_path.parent, exist_ok=True)
             with open(file_path, "w") as f:

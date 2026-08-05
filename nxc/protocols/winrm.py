@@ -23,6 +23,7 @@ from nxc.helpers.bloodhound import add_user_bh
 from nxc.helpers.logger import highlight
 from nxc.helpers.misc import gen_random_string
 from nxc.helpers.negotiate_parser import parse_challenge
+from nxc.helpers.filenames import sanitize_path_component
 from nxc.logger import NXCAdapter
 from nxc.paths import TMP_PATH
 
@@ -68,7 +69,7 @@ class winrm(connection):
             return False
 
         self.targetDomain = self.domain = ntlm_info["domain"]
-        self.hostname = ntlm_info["hostname"]
+        self.hostname = sanitize_path_component(ntlm_info["hostname"])
         self.server_os = ntlm_info["os_version"]
         self.logger.extra["hostname"] = self.hostname
 

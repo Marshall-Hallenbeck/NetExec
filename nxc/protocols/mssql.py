@@ -10,6 +10,7 @@ from nxc.helpers.misc import gen_random_string
 from nxc.logger import NXCAdapter
 from nxc.helpers.bloodhound import add_user_bh
 from nxc.helpers.negotiate_parser import parse_challenge, login7_integrated_auth_error_message
+from nxc.helpers.filenames import sanitize_path_component
 from nxc.helpers.powershell import create_ps_command
 from nxc.protocols.mssql.mssqlexec import MSSQLEXEC
 
@@ -145,7 +146,7 @@ class mssql(connection):
             if challenge.startswith(b"NTLMSSP\x00"):
                 ntlm_info = parse_challenge(challenge)
                 self.targetDomain = self.domain = ntlm_info["domain"]
-                self.hostname = ntlm_info["hostname"]
+                self.hostname = sanitize_path_component(ntlm_info["hostname"])
                 self.server_os = ntlm_info["os_version"]
                 self.logger.extra["hostname"] = self.hostname
             else:

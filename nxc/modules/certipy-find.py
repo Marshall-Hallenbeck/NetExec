@@ -8,6 +8,7 @@ from certipy.lib.formatting import pretty_print
 from datetime import datetime
 
 from nxc.helpers.misc import CATEGORY
+from nxc.helpers.filenames import sanitize_path_component
 from nxc.paths import NXC_PATH
 
 
@@ -119,7 +120,8 @@ class NXCModule:
         if self.json or self.csv or self.text:
             makedirs(self.output_path, exist_ok=True)
 
-        filename = f"certipy_{connection.hostname}_{connection.host}_{datetime.now().strftime('%Y-%m-%d_%H%M%S')}".replace(":", "-")
+        safe_hostname = sanitize_path_component(connection.hostname)
+        filename = f"certipy_{safe_hostname}_{connection.host}_{datetime.now().strftime('%Y-%m-%d_%H%M%S')}".replace(":", "-")
         if self.json:
             with open(f"{self.output_path}/{filename}.json", "w") as f:
                 json.dump(

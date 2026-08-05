@@ -18,6 +18,7 @@ from nxc.loaders.moduleloader import ModuleLoader
 from nxc.logger import nxc_logger, NXCAdapter
 from nxc.context import Context
 from nxc.paths import NXC_PATH
+from nxc.helpers.filenames import sanitize_path_component
 from nxc.protocols.ldap.laps import laps_search
 from nxc.helpers.pfx import pfx_auth
 
@@ -249,7 +250,8 @@ class connection:
 
             # Construct the output file template using os.path.join for OS compatibility
             base_log_dir = os.path.join(NXC_PATH, "logs")
-            filename_pattern = f"{self.hostname}_{self.host}_{datetime.now().strftime('%Y-%m-%d_%H%M%S')}".replace(":", "-")
+            safe_hostname = sanitize_path_component(self.hostname)
+            filename_pattern = f"{safe_hostname}_{self.host}_{datetime.now().strftime('%Y-%m-%d_%H%M%S')}".replace(":", "-")
             self.output_file_template = os.path.join(base_log_dir, "{output_folder}", filename_pattern)
             # Default output filename for logs
             self.output_filename = os.path.join(base_log_dir, filename_pattern)

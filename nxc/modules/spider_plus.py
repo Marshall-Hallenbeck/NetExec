@@ -175,7 +175,7 @@ class SMBSpiderPlus:
         self.logger.debug(f"Remote file: {remote_file}")
         raw_path = PurePosixPath(remote_file._RemoteFile__share, remote_file._RemoteFile__fileName.replace("\\", "/"))
         self.logger.debug(f"Raw path: {remote_file}")
-        clean_parts = [p for p in raw_path.parts if p not in ("..", ".")]
+        clean_parts = [p for p in raw_path.parts if p not in ("..", ".") and p.strip("/")]
         resolved = Path(self.output_folder).joinpath(self.host, *clean_parts)
         self.logger.debug(f"Resolved path: {resolved}")
         return str(resolved.parent), resolved.name

@@ -12,6 +12,7 @@ from nxc.helpers.bloodhound import add_user_bh
 from nxc.logger import NXCAdapter
 from nxc.config import host_info_colors, process_secret
 from nxc.paths import NXC_PATH
+from nxc.helpers.filenames import sanitize_path_component
 
 from aardwolf.connection import RDPConnection
 from aardwolf.commons.queuedata.constants import VIDEO_FORMAT
@@ -589,7 +590,8 @@ class rdp(connection):
             await asyncio.sleep(5)
             if self.conn is not None and self.conn.desktop_buffer_has_data is True:
                 buffer = self.conn.get_desktop_buffer(VIDEO_FORMAT.PIL)
-                filename = await Path(f"{NXC_PATH}/screenshots/{self.hostname}_{self.host}_{datetime.now().strftime('%Y-%m-%d_%H%M%S')}.png").expanduser()
+                safe_hostname = sanitize_path_component(self.hostname)
+                filename = await Path(f"{NXC_PATH}/screenshots/{safe_hostname}_{self.host}_{datetime.now().strftime('%Y-%m-%d_%H%M%S')}.png").expanduser()
                 buffer.save(filename, "png")
                 self.logger.highlight(f"Screenshot saved {filename}")
         except Exception as e:

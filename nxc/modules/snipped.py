@@ -86,8 +86,8 @@ class NXCModule:
 
                             remote_file_path = ntpath.join(screenshot_path, remote_file_name)
                             # replace \\ with underscores and ignore absolute path or path traversal attempts
-                            clean_screenshot_path = "_".join(p for p in PurePosixPath(screenshot_path.replace("\\", "/")).parts if p not in ("..", ".", "/"))
-                            clean_file = "_".join(p for p in PurePosixPath(remote_file_name.replace("\\", "/")).parts if p not in ("..", ".", "/"))
+                            clean_screenshot_path = "_".join(p for p in PurePosixPath(screenshot_path.replace("\\", "/")).parts if p not in ("..", ".") and p.strip("/"))
+                            clean_file = "_".join(p for p in PurePosixPath(remote_file_name.replace("\\", "/")).parts if p not in ("..", ".") and p.strip("/"))
 
                             local_file_path = join(user_output_dir, f"{clean_screenshot_path}_{clean_file}")
                             context.log.debug(f"{local_file_path=}")

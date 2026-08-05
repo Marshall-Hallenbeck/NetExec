@@ -207,9 +207,11 @@ class smb(connection):
         # self.targetDomain is the attribute which gets displayed as host domain
         if not self.no_ntlm:
             # Try to get hostname with getServerDNSHostName as getServerName is truncated to 15 chars
-            dns_hostname = self.conn.getServerDNSHostName().upper()
+            dns_hostname = self.conn.getServerDNSHostName()
+            dns_hostname = dns_hostname.upper() if dns_hostname else dns_hostname
             if dns_hostname and "." in dns_hostname:
-                self.hostname = dns_hostname.split(".")[0]
+                short_name = dns_hostname.split(".")[0]
+                self.hostname = short_name if short_name else self.conn.getServerName()
             elif dns_hostname:
                 self.hostname = dns_hostname
             else:

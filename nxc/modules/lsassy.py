@@ -15,6 +15,7 @@ from impacket.krb5.ccache import CCache
 
 from nxc.helpers.bloodhound import add_user_bh
 from nxc.helpers.misc import CATEGORY
+from nxc.helpers.filenames import sanitize_path_component
 from nxc.paths import NXC_PATH
 
 
@@ -162,7 +163,7 @@ class NXCModule:
         for ticket in tickets:
             for filename in ticket.kirbi_data:
                 try:
-                    base_filename = filename.split(".kirbi")[0]
+                    base_filename = sanitize_path_component(filename.split(".kirbi")[0])
                     timestamp = ticket.EndTime.strftime("%Y%m%d%H%M%S")
                     kirbi_data = ticket.kirbi_data[filename]
 
