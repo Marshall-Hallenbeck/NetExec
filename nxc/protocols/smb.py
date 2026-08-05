@@ -477,7 +477,7 @@ class smb(connection):
             self.logger.fail(f"CCache Error: {e}")
             return False
         except OSError as e:
-            used_ccache = " from ccache" if useCache else f":{process_secret(kerb_pass)}"
+            used_ccache = " from ccache" if useCache else ""
             if self.args.delegate:
                 used_ccache = f" through S4U with {username}"
             self.logger.fail(f"{domain}\\{self.username}{used_ccache} {e}")
@@ -495,7 +495,7 @@ class smb(connection):
                 self.inc_failed_login(username)
             return False
         except (ConnectionResetError, NetBIOSTimeout, NetBIOSError) as e:
-            used_ccache = " from ccache" if useCache else f":{process_secret(kerb_pass)}"
+            used_ccache = " from ccache" if useCache else ""
             if self.args.delegate:
                 used_ccache = f" through S4U with {username}"
             desc = e.getErrorString() if hasattr(e, "getErrorString") else str(e)
@@ -620,7 +620,7 @@ class smb(connection):
                 return False
         except (ConnectionResetError, NetBIOSTimeout, NetBIOSError) as e:
             desc = e.getErrorString() if hasattr(e, "getErrorString") else str(e)
-            self.logger.fail(f"{domain}\\{self.username}:{process_secret(self.password)} {desc}")
+            self.logger.fail(f"{domain}\\{self.username} {desc}")
             return False
         except BrokenPipeError:
             self.logger.fail("Broken Pipe Error while attempting to login")

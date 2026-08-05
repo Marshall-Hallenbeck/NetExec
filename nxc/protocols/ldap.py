@@ -201,6 +201,7 @@ class ldap(connection):
         target = ""
         target_domain = ""
         base_dn = ""
+        host_info_success = True
         try:
             resp = self.ldap_connection.search(
                 scope=ldapasn1_impacket.Scope("baseObject"),
@@ -221,6 +222,7 @@ class ldap(connection):
             )[3:]
         except Exception as e:
             self.logger.fail(f"Failed to enumerate host info for {self.host}, error: {e!s}")
+            host_info_success = False
 
         self.logger.debug(f"Target: {target}; target_domain: {target_domain}; base_dn: {base_dn}")
         self.target = target
@@ -280,6 +282,8 @@ class ldap(connection):
             )
         except Exception as e:
             self.logger.debug(f"Error adding host {self.host} into db: {e!s}")
+
+        return host_info_success
 
     def print_host_info(self):
         self.logger.debug("Printing host info for LDAP")

@@ -245,7 +245,7 @@ class connection:
             self.logger.info(f"Failed to create connection object for target {self.host}, exiting...")
         else:
             self.logger.debug("Created connection object")
-            self.enum_host_info()
+            host_info_result = self.enum_host_info()
 
             # Construct the output file template using os.path.join for OS compatibility
             base_log_dir = os.path.join(NXC_PATH, "logs")
@@ -255,7 +255,9 @@ class connection:
             self.output_filename = os.path.join(base_log_dir, filename_pattern)
 
             self.print_host_info()
-            if self.login() or (self.username == "" and self.password == "" and self.protocol != "mssql"):
+            if self.protocol == "ldap" and host_info_result is False:
+                self.logger.fail(f"Skipping authentication on {self.host} because host information discovery failed")
+            elif self.login() or (self.username == "" and self.password == "" and self.protocol != "mssql"):
                 self.logger.debug("Calling command arguments")
                 self.call_cmd_args()
                 if self.args.module:
@@ -559,9 +561,10 @@ class connection:
             with sem:
                 username = self.args.username[0] if len(self.args.username) else CCache.parseFile()[1]
                 password = self.args.password[0] if len(self.args.password) else ""
-                self.kerberos_login(self.domain, username, password, "", "", self.kdcHost, True)
-                self.logger.info("Successfully authenticated using Kerberos cache")
-                return True
+                if self.kerberos_login(self.domain, username, password, "", "", self.kdcHost, True):
+                    self.logger.info("Successfully authenticated using Kerberos cache")
+                    return True
+                return False
 
         if self.args.pfx_cert or self.args.pfx_base64 or self.args.pem_cert:
             self.logger.debug("Trying to authenticate using Certificate pfx")
