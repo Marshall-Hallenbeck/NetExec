@@ -23,7 +23,7 @@ from nxc.helpers.bloodhound import add_user_bh
 from nxc.helpers.logger import highlight
 from nxc.helpers.misc import gen_random_string
 from nxc.helpers.negotiate_parser import parse_challenge
-from nxc.logger import NXCAdapter
+from nxc.logger import NXCAdapter, sanitize_terminal
 from nxc.paths import TMP_PATH
 
 urllib3.disable_warnings()
@@ -279,10 +279,11 @@ class winrm(connection):
                         stream: list[str] = getattr(result[1], out_type)
                         for msg in stream:
                             if str(msg) != "None":
-                                if out_type == "error":
-                                    self.logger.fail(str(msg).rstrip())
-                                else:
-                                    self.logger.display(str(msg).rstrip())
+                                for line in str(msg).replace("\r", "").splitlines():
+                                    if out_type == "error":
+                                        self.logger.fail(sanitize_terminal(line.rstrip()))
+                                    else:
+                                        self.logger.display(sanitize_terminal(line.rstrip()))
                     # Display stdout
                     for line in result[0].splitlines():
                         self.logger.highlight(line.rstrip())

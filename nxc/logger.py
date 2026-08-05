@@ -1,4 +1,5 @@
 import logging
+import re
 from logging import LogRecord
 from logging.handlers import RotatingFileHandler
 import os.path
@@ -12,6 +13,27 @@ from rich.logging import RichHandler
 import functools
 import inspect
 import argparse
+
+
+# Matches OSC sequences (\x1b] ... BEL) and CSI/ANSI escapes (\x1b[ ... letter)
+ANSI_ESCAPE_RE = re.compile(r"\x1b\][^\x07]*\x07|\x1b\[[0-9;]*[A-Za-z]")
+# C0 (minus \t) and C1/DEL control characters that are not printable
+CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
+
+
+def sanitize_terminal(text: str) -> str:
+    """Neutralize target-controlled text before it reaches the terminal or log.
+
+    Strips ANSI/OSC escape sequences and C0/C1 control characters, and collapses
+    embedded carriage returns and newlines into spaces so a value cannot forge
+    new terminal lines or emit escape sequences. Normal printable UTF-8 (including
+    legitimate non-ASCII names) is left intact.
+    """
+    if not isinstance(text, str):
+        return text
+    text = ANSI_ESCAPE_RE.sub("", text)
+    text = text.replace("\r", " ").replace("\n", " ")
+    return CONTROL_CHARS_RE.sub("", text)
 
 
 def parse_debug_args():

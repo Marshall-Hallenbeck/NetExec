@@ -12,13 +12,17 @@ from terminaltables3 import AsciiTable
 from termcolor import colored
 
 from nxc.loaders.protocolloader import ProtocolLoader
+from nxc.logger import sanitize_terminal
 from nxc.paths import CONFIG_PATH, WORKSPACE_DIR
 from nxc.database import create_db_engine, open_config, get_workspace, get_db, write_configfile, create_workspace, set_workspace
 
 
 def print_table(data, title=None):
     print()
-    table = AsciiTable(data)
+    # Neutralize target-controlled cell values (hostname/domain/os/banner, etc.)
+    # so stored strings cannot forge terminal output or emit escape sequences
+    sanitized = [[sanitize_terminal(cell) if isinstance(cell, str) else cell for cell in row] for row in data]
+    table = AsciiTable(sanitized)
     if title:
         table.title = title
     print(table.table)

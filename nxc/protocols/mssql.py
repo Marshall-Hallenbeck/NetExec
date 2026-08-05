@@ -7,7 +7,7 @@ from nxc.config import process_secret, host_info_colors
 from nxc.connection import connection
 from nxc.connection import requires_admin
 from nxc.helpers.misc import gen_random_string
-from nxc.logger import NXCAdapter
+from nxc.logger import NXCAdapter, sanitize_terminal
 from nxc.helpers.bloodhound import add_user_bh
 from nxc.helpers.negotiate_parser import parse_challenge, login7_integrated_auth_error_message
 from nxc.helpers.powershell import create_ps_command
@@ -407,11 +407,12 @@ class mssql(connection):
         for keys in self.conn.replies:
             for _i, key in enumerate(self.conn.replies[keys]):
                 if key["TokenType"] == TDS_ERROR_TOKEN:
-                    error_msg = f"({key['MsgText'].decode('utf-16le')} Please try again with or without '--local-auth')"
-                    self.conn.lastError = SQLErrorException(f"ERROR: Line {key['LineNumber']:d}: {key['MsgText'].decode('utf-16le')}")
+                    msg_text = sanitize_terminal(key["MsgText"].decode("utf-16le"))
+                    error_msg = f"({msg_text} Please try again with or without '--local-auth')"
+                    self.conn.lastError = SQLErrorException(f"ERROR: Line {key['LineNumber']:d}: {msg_text}")
                     return error_msg
                 elif key["TokenType"] == TDS_INFO_TOKEN:
-                    return f"({key['MsgText'].decode('utf-16le')})"
+                    return f"({sanitize_terminal(key['MsgText'].decode('utf-16le'))})"
                 elif key["TokenType"] == TDS_LOGINACK_TOKEN:
                     return f"(ACK: Result: {key['Interface']} - {key['ProgName'].decode('utf-16le')} ({key['MajorVer']:d}{key['MinorVer']:d} {key['BuildNumHi']:d}{key['BuildNumLow']:d}) )"
                 elif key["TokenType"] == TDS_ENVCHANGE_TOKEN and key["Type"] in (
