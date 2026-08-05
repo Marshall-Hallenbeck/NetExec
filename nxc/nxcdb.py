@@ -25,6 +25,19 @@ def print_table(data, title=None):
     print()
 
 
+def escape_csv_formula(cell):
+    """Neutralizes CSV/spreadsheet formula injection.
+
+    Any cell whose string form starts with =, +, -, @, tab or carriage return can be
+    interpreted as a formula by spreadsheet applications. Prefixing a single quote forces
+    the value to be treated as text.
+    """
+    text = str(cell)
+    if text and text[0] in ("=", "+", "-", "@", "\t", "\r"):
+        return f"'{text}"
+    return text
+
+
 def write_csv(filename, headers, entries):
     """Writes a CSV file with the provided parameters."""
     with open(os.path.expanduser(filename), "w") as export_file:
@@ -35,9 +48,9 @@ def write_csv(filename, headers, entries):
             lineterminator="\n",
             escapechar="\\",
         )
-        csv_file.writerow(headers)
+        csv_file.writerow([escape_csv_formula(header) for header in headers])
         for entry in entries:
-            csv_file.writerow(entry)
+            csv_file.writerow([escape_csv_formula(cell) for cell in entry])
 
 
 def write_list(filename, entries):

@@ -5,6 +5,7 @@ from enum import Enum
 from impacket.ldap import ldaptypes
 from impacket.ldap.ldapasn1 import SDFlagsControl
 from impacket.uuid import bin_to_string
+from ldap3.utils.conv import escape_filter_chars
 from nxc.helpers.misc import CATEGORY
 from nxc.helpers.msada_guids import SCHEMA_OBJECTS, EXTENDED_RIGHTS
 from nxc.parsers.ldap_results import parse_result_attributes
@@ -190,8 +191,8 @@ class ALLOWED_OBJECT_ACE_MASK_FLAGS(Enum):
 
 
 SEARCH_FILTERS = {
-    "TARGET": lambda target: f"(sAMAccountName={target})",
-    "TARGET_DN": lambda target: f"(distinguishedName={target})"
+    "TARGET": lambda target: f"(sAMAccountName={escape_filter_chars(target)})",
+    "TARGET_DN": lambda target: f"(distinguishedName={escape_filter_chars(target)})"
 }
 
 
@@ -288,7 +289,7 @@ class NXCModule:
         if self.principal_sAMAccountName is not None:
             try:
                 resp = connection.search(
-                    searchFilter=f"(sAMAccountName={self.principal_sAMAccountName})",
+                    searchFilter=f"(sAMAccountName={escape_filter_chars(self.principal_sAMAccountName)})",
                     attributes=["objectSid"],
                 )
                 resp_parsed = parse_result_attributes(resp)[0]
@@ -353,7 +354,7 @@ class NXCModule:
         # Tries to resolve the SID from the LDAP domain dump
         try:
             resp = self.connection.search(
-                searchFilter=f"(objectSid={sid})",
+                searchFilter=f"(objectSid={escape_filter_chars(sid)})",
                 attributes=["sAMAccountName"],
             )
             return parse_result_attributes(resp)[0]["sAMAccountName"]

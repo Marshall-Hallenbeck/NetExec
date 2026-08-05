@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import csv
+import io
 import json
 import socket
 from os import makedirs
@@ -8,7 +10,24 @@ from certipy.lib.formatting import pretty_print
 from datetime import datetime
 
 from nxc.helpers.misc import CATEGORY
+from nxc.nxcdb import escape_csv_formula
 from nxc.paths import NXC_PATH
+
+
+def escape_certipy_csv(csv_text):
+    """Reparses certipy-generated CSV text and neutralizes formula injection in every cell.
+
+    Certipy emits already-formatted, semicolon-delimited, QUOTE_ALL CSV text built from
+    attacker-influenceable AD CS values (template, CA and policy names). This reparses that
+    text and re-emits it with the same dialect, escaping any cell that starts with a
+    formula-leading character.
+    """
+    reader = csv.reader(io.StringIO(csv_text, newline=""), delimiter=";", quoting=csv.QUOTE_ALL)
+    out = io.StringIO(newline="")
+    writer = csv.writer(out, delimiter=";", quoting=csv.QUOTE_ALL, lineterminator="\r\n")
+    for row in reader:
+        writer.writerow([escape_csv_formula(cell) for cell in row])
+    return out.getvalue()
 
 
 class NXCModule:
@@ -129,8 +148,8 @@ class NXCModule:
                     default=str,
                 )
         if self.csv:
-            template_output = finder.get_template_output_for_csv(output)
-            ca_output = finder.get_ca_output_for_csv(output)
+            template_output = escape_certipy_csv(finder.get_template_output_for_csv(output))
+            ca_output = escape_certipy_csv(finder.get_ca_output_for_csv(output))
             with open(f"{self.output_path}/{filename}-templates.csv", "w") as f:
                 f.write(template_output)
             with open(f"{self.output_path}/{filename}-cas.csv", "w") as f:

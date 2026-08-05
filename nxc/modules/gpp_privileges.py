@@ -2,6 +2,7 @@ import re
 from io import BytesIO
 from impacket.ldap import ldap as ldap_impacket
 from impacket.ldap import ldapasn1 as ldapasn1_impacket
+from ldap3.utils.conv import escape_filter_chars
 from nxc.helpers.misc import CATEGORY
 from nxc.parsers.ldap_results import parse_result_attributes
 
@@ -213,7 +214,7 @@ class NXCModule:
             try:
                 resp = ldap_connection.search(
                     searchBase=base_dn,
-                    searchFilter=f"(objectSid={sid})",
+                    searchFilter=f"(objectSid={escape_filter_chars(sid)})",
                     attributes=["sAMAccountName"],
                 )
                 parsed_result = parse_result_attributes(resp)

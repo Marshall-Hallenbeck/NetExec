@@ -35,6 +35,7 @@ from impacket.ldap import ldap as ldap_impacket
 from impacket.ldap import ldaptypes
 from impacket.ldap import ldapasn1 as ldapasn1_impacket
 from impacket.ldap.ldap import LDAPFilterSyntaxError, MODIFY_REPLACE
+from ldap3.utils.conv import escape_filter_chars
 from impacket.smbconnection import SessionError
 from impacket.ntlm import getNTLMSSPType1
 
@@ -636,7 +637,7 @@ class ldap(connection):
             attributes = ["distinguishedName"]
             resp = self.search(search_filter, attributes, baseDN=self.baseDN)
             resp_parsed = parse_result_attributes(resp)
-            answers = [f"(memberOf:1.2.840.113556.1.4.1941:={item['distinguishedName']})" for item in resp_parsed]
+            answers = [f"(memberOf:1.2.840.113556.1.4.1941:={escape_filter_chars(item['distinguishedName'])})" for item in resp_parsed]
             if len(answers) == 0:
                 self.logger.debug("No groups with default privileged RID were found. Assuming user is not a Domain Administrator.")
                 return
@@ -759,7 +760,7 @@ class ldap(connection):
                 group = group_parsed[0]
 
             # Search filter: user must have membership OR primaryGroupID
-            search_filter = f"(|(memberOf={group['distinguishedName']})(primaryGroupID={group['objectSid'].split('-')[-1]}))"
+            search_filter = f"(|(memberOf={escape_filter_chars(group['distinguishedName'])})(primaryGroupID={group['objectSid'].split('-')[-1]}))"
             attributes = ["sAMAccountName", "distinguishedName", "cn", "objectClass"]
 
         else:
@@ -980,14 +981,14 @@ class ldap(connection):
 
         if self.args.targeted_kerberoast:
             target_users = parse_argument(self.args.targeted_kerberoast)
-            user_filter = "".join(f"(sAMAccountName={user})" for user in target_users)
+            user_filter = "".join(f"(sAMAccountName={escape_filter_chars(user)})" for user in target_users)
             searchFilter = f"(&(objectCategory=person)(!(servicePrincipalName=*))(|{user_filter}))"
         elif self.args.kerberoast_account:
             target_accounts = parse_argument(self.args.kerberoast_account)
             self.logger.info(f"Targeting specific accounts for kerberoasting: {', '.join(target_accounts)}")
 
             # build search filter for specific users
-            user_filter = "".join([f"(sAMAccountName={username})" for username in target_accounts])
+            user_filter = "".join([f"(sAMAccountName={escape_filter_chars(username)})" for username in target_accounts])
             searchFilter = f"(&(servicePrincipalName=*)(|{user_filter}))"
         else:
             # default to all
