@@ -3,6 +3,15 @@ from nxc.helpers.misc import CATEGORY
 from nxc.parsers.ldap_results import parse_result_attributes
 
 
+def to_text(value):
+    """Normalize a possibly bytes/list/missing LDAP value to a string"""
+    if isinstance(value, list):
+        value = value[0] if value else ""
+    if isinstance(value, bytes):
+        value = value.decode("utf-8", errors="replace")
+    return value if isinstance(value, str) else ""
+
+
 class NXCModule:
     """
     Get the scriptPath attribute of users
@@ -38,12 +47,12 @@ class NXCModule:
         context.log.debug(f"Total of records returned {len(resp)}")
         answers = parse_result_attributes(resp)
         context.log.debug(f"Filtering for scriptPath containing: {self.filter}")
-        filtered_answers = list(filter(lambda x: self.filter in x["scriptPath"], answers))
+        filtered_answers = [x for x in answers if self.filter in to_text(x.get("scriptPath"))]
 
         if filtered_answers:
             context.log.success("Found the following attributes: ")
             for answer in filtered_answers:
-                context.log.highlight(f"User: {answer['sAMAccountName']:<20} ScriptPath: {answer['scriptPath']}")
+                context.log.highlight(f"User: {to_text(answer.get('sAMAccountName')):<20} ScriptPath: {to_text(answer.get('scriptPath'))}")
 
             # Save the results to a file
             if self.outputfile:
@@ -55,7 +64,7 @@ class NXCModule:
         """Save the results to a JSON file."""
         try:
             # Format answers as a list of dictionaries for JSON output
-            json_data = [{"sAMAccountName": answer["sAMAccountName"], "scriptPath": answer["scriptPath"]} for answer in answers]
+            json_data = [{"sAMAccountName": to_text(answer.get("sAMAccountName")), "scriptPath": to_text(answer.get("scriptPath"))} for answer in answers]
 
             # Save the JSON data to the specified file
             with open(self.outputfile, "w") as f:

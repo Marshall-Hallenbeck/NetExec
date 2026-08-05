@@ -758,8 +758,17 @@ class ldap(connection):
             else:
                 group = group_parsed[0]
 
+            # Resolve DN and objectSid defensively: objectSid may be missing, bytes, or a list
+            group_dn = group.get("distinguishedName", "")
+            object_sid = group.get("objectSid", "")
+            if isinstance(object_sid, list):
+                object_sid = object_sid[0] if object_sid else ""
+            if isinstance(object_sid, bytes):
+                object_sid = object_sid.decode("utf-8", errors="replace")
+            primary_group_id = object_sid.split("-")[-1] if object_sid else ""
+
             # Search filter: user must have membership OR primaryGroupID
-            search_filter = f"(|(memberOf={group['distinguishedName']})(primaryGroupID={group['objectSid'].split('-')[-1]}))"
+            search_filter = f"(|(memberOf={group_dn})(primaryGroupID={primary_group_id}))"
             attributes = ["sAMAccountName", "distinguishedName", "cn", "objectClass"]
 
         else:
@@ -778,7 +787,9 @@ class ldap(connection):
                 for item in resp_parsed:
                     # Display sAMAccountName or CN if sAMAccountName not present (could be a group)
                     # Fallback to cn should sAMAccountName not be present (e.g. Service Principal Names)
-                    self.logger.highlight(item.get("sAMAccountName", item["cn"]) if "group" not in item["objectClass"] else item["cn"])
+                    cn = item.get("cn", "")
+                    object_class = item.get("objectClass", "")
+                    self.logger.highlight(item.get("sAMAccountName", cn) if "group" not in object_class else cn)
         else:
             # Display all groups
             self.logger.highlight(f"{'-Group-':<40} {'-Members-':<9} {'-Description-':<60}")
@@ -1029,6 +1040,11 @@ class ldap(connection):
         for user in enabled:
             spn_added = False
 
+            # Guard against malformed entries missing the attributes used below
+            if not user.get("sAMAccountName") or (self.args.targeted_kerberoast and not user.get("distinguishedName")):
+                self.logger.debug(f"Skipping entry missing sAMAccountName/distinguishedName: {user}")
+                continue
+
             if self.args.targeted_kerberoast:
                 try:
                     self.ldap_connection.modify(user["distinguishedName"], {"servicePrincipalName": [(MODIFY_REPLACE, [f"cifs/{user['sAMAccountName']}"])]})
@@ -1080,6 +1096,10 @@ class ldap(connection):
                         self.logger.fail(f"Principal: {self.targetDomain}\\{user['sAMAccountName']} - {e}")
                 else:
                     self.logger.fail(f"Error retrieving TGT for {self.domain}\\{self.username} from {self.kdcHost}")
+            except Exception as e:
+                # A single user's KDC/network failure must not abort the whole loop
+                self.logger.debug(f"Exception: {e}", exc_info=True)
+                self.logger.fail(f"Failed to kerberoast {user['sAMAccountName']}: {e}")
             finally:
                 if spn_added:
                     try:
@@ -1517,19 +1537,29 @@ class ldap(connection):
             self.logger.fail("No domain password policy found!")
             return
 
+        def to_int(value, default=0):
+            """Coerce a possibly bytes/list/missing LDAP value to int, defaulting on failure"""
+            if isinstance(value, list):
+                value = value[0] if value else default
+            if isinstance(value, bytes):
+                value = value.decode("utf-8", errors="replace")
+            try:
+                return int(value)
+            except (TypeError, ValueError):
+                return default
+
         for policy in resp_parsed:
             def ldap_to_filetime(ldap_time):
                 """Convert LDAP time to FILETIME format for convert function"""
-                if not ldap_time or ldap_time == "0":
+                time_int = to_int(ldap_time, 0)
+                if time_int == 0:
                     return 0, 0
 
-                time_int = int(ldap_time)
-                if time_int < 0:
-                    time_int = abs(time_int)
-
+                negative = time_int < 0
+                time_int = abs(time_int)
                 low = time_int & 0xFFFFFFFF
                 high = (time_int >> 32) & 0xFFFFFFFF
-                if ldap_time.startswith("-") or int(ldap_time) < 0:
+                if negative:
                     high = -high
 
                 return low, high
@@ -1541,16 +1571,16 @@ class ldap(connection):
             min_pwd_age_low, min_pwd_age_high = ldap_to_filetime(policy.get("minPwdAge", "0"))
             min_pass_age = convert(min_pwd_age_low, min_pwd_age_high)
             accnt_lock_thres = policy.get("lockoutThreshold", "None")
-            lockout_duration_val = policy.get("lockoutDuration", "0")
-            lock_accnt_dur = convert(0, int(lockout_duration_val) if lockout_duration_val != "0" else 0, lockout=True)
-            lockout_obs_val = policy.get("lockOutObservationWindow", "0")
-            rst_accnt_lock_counter = convert(0, int(lockout_obs_val) if lockout_obs_val != "0" else 0, lockout=True)
+            lockout_duration_val = to_int(policy.get("lockoutDuration", "0"), 0)
+            lock_accnt_dur = convert(0, lockout_duration_val, lockout=True)
+            lockout_obs_val = to_int(policy.get("lockOutObservationWindow", "0"), 0)
+            rst_accnt_lock_counter = convert(0, lockout_obs_val, lockout=True)
             force_logoff_low, force_logoff_high = ldap_to_filetime(policy.get("forceLogoff", "0"))
             force_logoff_time = convert(force_logoff_low, force_logoff_high)
 
             # Convert password properties using existing d2b function
-            pwd_properties = policy.get("pwdProperties", "0")
-            pass_prop = d2b(int(pwd_properties)) if pwd_properties != "0" else "000000"
+            pwd_properties = to_int(policy.get("pwdProperties", "0"), 0)
+            pass_prop = d2b(pwd_properties) if pwd_properties != 0 else "000000"
 
             # Use the same formatting and constants as SMB passpol
             PASSCOMPLEX = {
@@ -1571,7 +1601,10 @@ class ldap(connection):
             self.logger.highlight(f"Password Complexity Flags: {pass_prop or 'None'}")
 
             for i, a in enumerate(pass_prop):
-                self.logger.highlight(f"\t{PASSCOMPLEX[i]} {a!s}")
+                label = PASSCOMPLEX.get(i)
+                if label is None:
+                    continue
+                self.logger.highlight(f"\t{label} {a!s}")
 
             self.logger.highlight("")
             self.logger.highlight(f"Minimum password age: {min_pass_age}")

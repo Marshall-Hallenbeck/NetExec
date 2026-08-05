@@ -418,7 +418,8 @@ class wmi(connection):
         self.logger.highlight(f"{'Drive':<8}{'Shadow Copy ID':<40}{'ClientAccessible':<18}{'InstallDate':<27}{'Device Object':<50}")
         self.logger.highlight(f"{'------':<8}{'--------------':<40}{'----------------':<18}{'-----------':<27}{'-------------':<50}")
         for record in snapshots:
-            self.logger.highlight(f"{drive:<8}{record['ID']['value']:<40}{record['ClientAccessible']['value']:<18}{record['InstallDate']['value']:<27}{record['DeviceObject']['value']:<50}")
+            install_date = (record.get("InstallDate") or {}).get("value") or ""
+            self.logger.highlight(f"{drive:<8}{record['ID']['value']:<40}{record['ClientAccessible']['value']:<18}{install_date:<27}{record['DeviceObject']['value']:<50}")
 
     @requires_admin
     def execute(self, command=None, get_output=False, use_powershell=False):

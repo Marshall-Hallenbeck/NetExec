@@ -458,7 +458,7 @@ class winrm(connection):
                     credential_files.append(local_cred_file)
 
         if not credential_files:
-            self.log.fail(f"No credential files found for user {self.username}")
+            self.logger.fail(f"No credential files found for user {self.username}")
             return
 
         for creds_file in credential_files:

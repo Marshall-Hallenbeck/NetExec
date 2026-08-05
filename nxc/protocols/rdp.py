@@ -458,7 +458,13 @@ class rdp(connection):
                 await asyncio.sleep(self.args.cmd_delay)
 
                 timeout_counter = 0
+                # Wall-clock deadline so a server flooding the queue (which prevents timeout_counter
+                # from ever advancing) cannot hang this loop indefinitely.
+                deadline = asyncio.get_running_loop().time() + self.args.clipboard_delay
                 while not clipboard_ready and timeout_counter < (self.args.clipboard_delay * 10):  # Convert seconds to deciseconds
+                    if asyncio.get_running_loop().time() >= deadline:
+                        self.logger.debug("Clipboard wait wall-clock deadline reached")
+                        break
                     try:
                         data = await asyncio.wait_for(self.conn.ext_out_queue.get(), timeout=0.1)
                         if hasattr(data, "type") and data.type.name == "CLIPBOARD_READY":
@@ -510,9 +516,16 @@ class rdp(connection):
                 await asyncio.sleep(self.args.cmd_delay)
 
                 if get_output:
-                    # Get the current clipboard text
+                    # Get the current clipboard text with an outer timeout so a stalled read cannot hang
                     self.logger.debug("Getting clipboard content...")
-                    clipboard_text = await self.conn.get_current_clipboard_text()
+                    try:
+                        clipboard_text = await asyncio.wait_for(
+                            self.conn.get_current_clipboard_text(),
+                            timeout=max(self.args.clipboard_delay, 1),
+                        )
+                    except asyncio.TimeoutError:
+                        self.logger.fail("Timed out reading clipboard content")
+                        return ""
 
                     if clipboard_text:
                         self.logger.debug("Command output retrieved from clipboard:")

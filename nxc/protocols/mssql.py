@@ -44,6 +44,7 @@ class mssql(connection):
         self.lmhash = ""
         self.nthash = ""
         self.no_ntlm = False
+        self.encryption = False  # Set during preLogin(); default here so print_host_info() is safe on preLogin failure
 
         connection.__init__(self, args, db, host)
 
@@ -506,7 +507,7 @@ class mssql(connection):
             self.logger.highlight(f"{'Database Name':<30} {'Owner':<25}")
             self.logger.highlight(f"{'-' * 30} {'-' * 25}")
             for r in rows:
-                self.logger.highlight(f"{r.get('DatabaseName', ''):<30} {r.get('Owner', ''):<25}")
+                self.logger.highlight(f"{r.get('DatabaseName') or '':<30} {r.get('Owner') or '':<25}")
             self.logger.highlight(f"Total: {len(rows)} database(s)")
         except Exception as e:
             self.logger.fail(f"Failed to enumerate databases: {e}")

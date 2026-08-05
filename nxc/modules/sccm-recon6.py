@@ -108,19 +108,20 @@ class NXCModule:
                 # Resolve site database name
                 target = self.connection.resolver(subkey)
                 if target is None:
-                    try:
-                        new_conn = SMBConnection(subkey, subkey)
-                    except Exception as e:
-                        self.context.log.fail(f"Connection error to {subkey}: {e}")
-                        continue
-                else:
-                    try:
-                        new_conn = SMBConnection(subkey, target["host"])
-                    except Exception as e:
-                        self.context.log.fail(f"Connection error to {target['host']}: {e}")
-                        continue
+                    # Do not connect to an unresolved, attacker-controlled registry name (SSRF risk)
+                    self.context.log.fail(f"Could not resolve site database host {subkey}, skipping")
+                    continue
 
-                if new_conn.isSigningRequired():
-                    self.context.log.display(f"       SMB signing: {new_conn.isSigningRequired()}")
-                else:
-                    self.context.log.highlight(f"       SMB signing: {new_conn.isSigningRequired()} - TAKEOVER-2")
+                new_conn = None
+                try:
+                    new_conn = SMBConnection(subkey, target["host"], timeout=self.connection.args.smb_timeout)
+                    if new_conn.isSigningRequired():
+                        self.context.log.display(f"       SMB signing: {new_conn.isSigningRequired()}")
+                    else:
+                        self.context.log.highlight(f"       SMB signing: {new_conn.isSigningRequired()} - TAKEOVER-2")
+                except Exception as e:
+                    self.context.log.fail(f"Connection error to {target['host']}: {e}")
+                finally:
+                    if new_conn is not None:
+                        with contextlib.suppress(Exception):
+                            new_conn.close()

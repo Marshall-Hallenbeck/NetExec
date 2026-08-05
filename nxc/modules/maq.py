@@ -33,4 +33,9 @@ class NXCModule:
             context.log.fail("No LDAP entries returned.")
             return
 
-        context.log.highlight(f"MachineAccountQuota: {entries[0]['ms-DS-MachineAccountQuota']}")
+        maq = entries[0].get("ms-DS-MachineAccountQuota")
+        if maq is None:
+            context.log.fail("ms-DS-MachineAccountQuota attribute not present in LDAP response.")
+            return
+
+        context.log.highlight(f"MachineAccountQuota: {maq}")

@@ -1462,6 +1462,9 @@ class smb(connection):
                 if binding_attempts == 1:   # Last attempt
                     self.logger.info(f"The Remote Registry service seems to be disabled on {self.hostname}.")
                     return
+            except Exception as e:
+                self.logger.fail(f"Unexpected error binding to the Remote Registry on {self.hostname}: {e}")
+                return
             # STATUS_PIPE_NOT_AVAILABLE : Waiting 1 second for the service to start (if idle and set to 'Automatic' startup type)
             sleep(1)
 
@@ -1471,11 +1474,12 @@ class smb(connection):
         except DCERPCException as e:
             if "rpc_s_access_denied" in str(e).lower():
                 self.logger.info(f"Access denied while enumerating session using the Remote Registry on {self.hostname}.")
-                return
             else:
                 self.logger.fail(f"Exception connecting to RPC on {self.hostname}: {e}")
+            return
         except Exception as e:
             self.logger.fail(f"Exception connecting to RPC on {self.hostname}: {e}")
+            return
 
         # Enumerate HKU subkeys and recover SIDs
         sid_filter = "^S-1-.*\\d$"
@@ -1500,6 +1504,9 @@ class smb(connection):
                 else:
                     self.logger.fail(f"Error enumerating HKU subkeys on {self.hostname}: {e}")
                     break
+            except Exception as e:
+                self.logger.fail(f"Error enumerating HKU subkeys on {self.hostname}: {e}")
+                break
 
         rrp.hBaseRegCloseKey(dce, key_handle)
         dce.disconnect()
@@ -2477,7 +2484,7 @@ class smb(connection):
 
         if self.output_file:
             self.output_file.close()
-            with open(self.output_file_template.format(output_folder="dpapi")) as f:
+            with open(self.output_file_template.format(output_folder="dpapi"), encoding="utf-8") as f:
                 if sum(1 for _ in f) == 0:
                     self.logger.fail("No dpapi loot retrieved")
 

@@ -31,11 +31,15 @@ class NXCModule:
             # Get dynamic updates configuration for each zones
             allows_nonsecure_updates = []
             for zone in zones:
-                for prop in zone["dNSProperty"]:
+                # A single dNSProperty value is returned as a scalar; normalize to a list
+                dns_props = zone.get("dNSProperty", [])
+                if not isinstance(dns_props, list):
+                    dns_props = [dns_props]
+                for prop in dns_props:
                     dns_properties = DNS_PROPERTY(prop)
 
                     # [MS-DNSP] 2.2.5.2.4.1 - DNS_RPC_ZONE_INFO_W2K - fAllowUpdate
-                    if dns_properties["Id"] == DSPROPERTY_ZONE_ALLOW_UPDATE and int.from_bytes(dns_properties["Data"]) == ZONE_UPDATE_UNSECURE:
+                    if dns_properties["Id"] == DSPROPERTY_ZONE_ALLOW_UPDATE and int.from_bytes(dns_properties["Data"], byteorder="little") == ZONE_UPDATE_UNSECURE:
                         allows_nonsecure_updates.append(zone["name"])
 
             if allows_nonsecure_updates:

@@ -74,8 +74,9 @@ class vnc(connection):
                     return None
                 n = nbytes[0]
                 if n == 0:
-                    # Server reports failure; read reason
+                    # Server reports failure; read reason (cap length so a hostile server cannot force a huge recv)
                     ln = struct.unpack("!I", s.recv(4))[0]
+                    ln = min(ln, 8192)
                     reason = s.recv(ln)
                     self.logger.debug(f"RFB failure: {reason}")
                     return None

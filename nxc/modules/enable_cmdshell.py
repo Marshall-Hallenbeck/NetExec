@@ -46,14 +46,20 @@ class NXCModule:
 
     def backup_show_advanced_options(self):
         """Backs up the current state of 'show advanced options'."""
-        res = self.mssql_conn.sql_query("SELECT CAST(value AS INT) AS value FROM sys.configurations WHERE name = 'show advanced options'")
-        if res:
-            self.advanced_options_backup = int(res[0]["value"])  # Convert to integer
+        try:
+            res = self.mssql_conn.sql_query("SELECT CAST(value AS INT) AS value FROM sys.configurations WHERE name = 'show advanced options'")
+            if res and isinstance(res[0], dict) and "value" in res[0]:
+                self.advanced_options_backup = int(res[0]["value"])  # Convert to integer
+        except (ValueError, TypeError, KeyError, IndexError) as e:
+            self.context.log.debug(f"Could not read 'show advanced options' state: {e}")
 
     def restore_show_advanced_options(self):
         """Restores the original state of 'show advanced options' if needed."""
         if self.advanced_options_backup is not None and self.advanced_options_backup == 0:
-            self.mssql_conn.sql_query("EXEC sp_configure 'show advanced options', '0'; RECONFIGURE;")
+            try:
+                self.mssql_conn.sql_query("EXEC sp_configure 'show advanced options', '0'; RECONFIGURE;")
+            except Exception as e:
+                self.context.log.debug(f"Could not restore 'show advanced options': {e}")
 
     def toggle_xp_cmdshell(self, enable: bool):
         """Enables or disables xp_cmdshell while preserving 'show advanced options' state."""
@@ -64,7 +70,10 @@ class NXCModule:
         self.backup_show_advanced_options()
 
         # Enable 'show advanced options' if it was disabled
-        self.mssql_conn.sql_query("EXEC sp_configure 'show advanced options', '1'; RECONFIGURE;")
+        try:
+            self.mssql_conn.sql_query("EXEC sp_configure 'show advanced options', '1'; RECONFIGURE;")
+        except Exception as e:
+            self.context.log.debug(f"Could not enable 'show advanced options': {e}")
 
         try:
             # Enable or disable xp_cmdshell

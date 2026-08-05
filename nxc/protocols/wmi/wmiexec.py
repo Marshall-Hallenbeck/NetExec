@@ -152,6 +152,14 @@ class WMIEXEC:
 
             self.logger.debug(f"Number of chunks: {num_chunks}")
 
+            # Cap the server-controlled chunk count to avoid unbounded allocation
+            max_chunks = 100000
+            if not isinstance(num_chunks, int) or num_chunks < 0:
+                num_chunks = 0
+            if num_chunks > max_chunks:
+                self.logger.debug(f"Capping num_chunks from {num_chunks} to {max_chunks}")
+                num_chunks = max_chunks
+
             # Retrieve each chunk and decode the base64 content
             outputBuffer_b64 = ""
             for i in range(num_chunks):

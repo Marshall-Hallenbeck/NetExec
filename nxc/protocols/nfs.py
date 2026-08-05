@@ -512,7 +512,11 @@ class nfs(connection):
             if res["status"] != 0:
                 self.logger.fail(f"Error getting FSINFO for {remote_file_path}: {NFSSTAT3[res['status']]}")
                 return
+            # Clamp the server-provided chunk size to a sane range (positive, <= 1 MiB)
             chunk_size = res["resok"]["wtpref"]
+            if not isinstance(chunk_size, int) or chunk_size <= 0:
+                chunk_size = 1 << 20
+            chunk_size = min(chunk_size, 1 << 20)
 
             self.logger.display(f"Transferring data from '{local_file_path}' to '{remote_file_path}'")
             try:
@@ -746,10 +750,25 @@ class nfs(connection):
             return
         content = self.format_directory(dir_listing)
 
-        # If there are more entries than we could receive, get cookie from last entry and continue
+        # If there are more entries than we could receive, get cookie from last entry and continue.
+        # Bound the loop so a hostile/broken server cannot make it spin forever, and guard against
+        # a cookie that never advances (which would otherwise loop indefinitely).
+        max_pages = 10000
+        pages = 0
+        seen_cookies = set()
         while not dir_listing["resok"]["reply"]["eof"]:
+            pages += 1
+            if pages > max_pages:
+                self.logger.debug("Reached maximum READDIRPLUS page count; stopping pagination")
+                break
+            if not content:
+                break
             cookie_verf = dir_listing["resok"]["cookieverf"]
             cookie = content[-1]["cookie"]
+            if cookie in seen_cookies:
+                self.logger.debug("READDIRPLUS cookie did not advance; stopping pagination")
+                break
+            seen_cookies.add(cookie)
             dir_listing = self.nfs3.readdirplus(curr_fh, cookie=cookie, cookie_verf=cookie_verf, auth=self.auth)
             more_content = self.format_directory(dir_listing)
             content.extend(more_content)

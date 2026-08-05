@@ -163,7 +163,15 @@ class TSCH_EXEC:
                 self.logger.debug(f"hSchRpcRun returned: {e}")
 
         done = False
+        # Bound the poll loop so a task that never reports completion cannot spin forever.
+        # On timeout we break out and still fall through to task deletion/cleanup below.
+        max_poll_attempts = 60  # ~120s at 2s per attempt
+        attempts = 0
         while not done:
+            if attempts >= max_poll_attempts:
+                self.logger.fail("Timed out waiting for scheduled task to report completion")
+                break
+            attempts += 1
             self.logger.debug(f"Calling SchRpcGetLastRunInfo for \\{self.task_name}")
             try:
                 resp = tsch.hSchRpcGetLastRunInfo(dce, f"\\{self.task_name}")
