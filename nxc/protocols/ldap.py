@@ -1738,7 +1738,9 @@ class ldap(connection):
             # Write individual JSON files
             adcs_files = []
             for node_type, content in result.to_dict().items():
-                filename = f"{timestamp}{node_type}.json"
+                # Prefix with the target-specific output name so concurrent targets writing in the
+                # shared CWD within the same second do not collide and overwrite each other.
+                filename = f"{self.output_filename.split('/')[-1]}{timestamp}{node_type}.json"
                 with open(filename, "w") as f:
                     json.dump(content, f)
                 adcs_files.append(filename)

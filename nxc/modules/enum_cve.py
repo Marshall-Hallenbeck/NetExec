@@ -89,13 +89,16 @@ class NXCModule:
                 if self.CVE_PATCHES[cve].get("dc_only") and not connection.is_host_dc():
                     context.log.info(f"Skipping {self.CVE_PATCHES[cve]['alias']} - only applicable to Domain Controllers")
                     continue
-                if self.is_vulnerable(connection.server_os_major, connection.server_os_minor, connection.server_os_build, ubr, self.CVE_PATCHES[cve]["patches"]):
+                vulnerable = self.is_vulnerable(connection.server_os_major, connection.server_os_minor, connection.server_os_build, ubr, self.CVE_PATCHES[cve]["patches"])
+                if vulnerable:
                     if connection.conn.isSigningRequired() and "signing_message" in self.CVE_PATCHES[cve]:  # Special conditional message for some CVEs
                         context.log.highlight(f"{cve.upper()} - {self.CVE_PATCHES[cve]['alias']} - {self.CVE_PATCHES[cve]['signing_message']}")
                     else:
                         context.log.highlight(f"{cve.upper()} - {self.CVE_PATCHES[cve]['alias']} - {self.CVE_PATCHES[cve]['message']}")
                     if self.exploitation_details:
                         context.log.highlight(f"Exploitation details: {self.CVE_PATCHES[cve]['exploitation']}")
+                elif vulnerable is None:
+                    context.log.info(f"Unable to determine {self.CVE_PATCHES[cve]['alias']} status - unknown OS build {connection.server_os_major}.{connection.server_os_minor}.{connection.server_os_build}.{ubr}")
                 else:
                     context.log.info(f"Not vulnerable to {self.CVE_PATCHES[cve]['alias']} (UBR {ubr} >= {self.CVE_PATCHES[cve]['patches'].get((connection.server_os_major, connection.server_os_minor, connection.server_os_build), 'unknown')})")
 
@@ -105,6 +108,10 @@ class NXCModule:
         "CVE-2025-33073": {
             "alias": "NTLM reflection",
             "patches": {
+                (6, 0, 6003): 23351,      # Windows Server 2008 SP2
+                (6, 1, 7601): 27769,      # Windows Server 2008 R2 SP1
+                (6, 2, 9200): 25522,      # Windows Server 2012
+                (6, 3, 9600): 22620,      # Windows Server 2012 R2
                 (10, 0, 10240): 21034,    # Windows 10 1507
                 (10, 0, 14393): 8148,     # Windows Server 2016 / Win10 1607
                 (10, 0, 17763): 7434,     # Windows Server 2019 / Win10 1809
@@ -145,7 +152,6 @@ class NXCModule:
         # https://decoder.cloud/2025/11/24/reflecting-your-authentication-when-windows-ends-up-talking-to-itself/
         "CVE-2025-54918": {
             "alias": "NTLM MIC Bypass",
-            "dc_only": True,
             "patches": {
                 (6, 0, 6003): 23529,      # Windows Server 2008 SP2
                 (6, 1, 7601): 27929,      # Windows Server 2008 R2 SP1

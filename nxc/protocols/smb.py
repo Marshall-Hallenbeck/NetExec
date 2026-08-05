@@ -2179,9 +2179,11 @@ class smb(connection):
 
             def add_sam_hash(sam_hash, host_id):
                 self.logger.highlight(sam_hash)
-                if "_history" in sam_hash:
-                    return
                 username, _, lmhash, nthash, _, _, _ = sam_hash.split(":")
+                # impacket emits password-history entries as "username_history<N>:rid:...".
+                # Only skip those, not a real account whose name merely contains "_history".
+                if re.search(r"_history\d+$", username):
+                    return
                 self.db.add_credential(
                     "hash",
                     self.hostname,
