@@ -7,6 +7,16 @@ from nxc.helpers.misc import CATEGORY
 from nxc.paths import NXC_PATH
 
 
+def quote_ident(name):
+    """Escape a T-SQL bracket identifier by doubling closing brackets."""
+    return "[" + name.replace("]", "]]") + "]"
+
+
+def quote_literal(value):
+    """Escape a T-SQL single-quoted string literal by doubling single quotes."""
+    return value.replace("'", "''")
+
+
 class NXCModule:
     """MSSQL Dumper v1 - Created by LTJAX"""
     name = "mssql_dumper"
@@ -74,69 +84,73 @@ class NXCModule:
             if db_name.lower() in ("master", "model", "msdb", "tempdb"):
                 continue  # skip system DBs
 
-            context.log.display(f"Searching database: {db_name}")
-            connection.conn.sql_query(f"USE [{db_name}]")
+            try:
+                context.log.display(f"Searching database: {db_name}")
+                connection.conn.sql_query(f"USE {quote_ident(db_name)}")
 
-            # get all tables in this DB
-            tables = connection.conn.sql_query("SELECT table_name FROM information_schema.tables WHERE table_type = 'BASE TABLE'")
+                # get all tables in this DB
+                tables = connection.conn.sql_query("SELECT table_name FROM information_schema.tables WHERE table_type = 'BASE TABLE'")
 
-            for table in tables:
-                table_name = table.get("table_name", "")
-                try:
-                    columns = connection.conn.sql_query(f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table_name}'")
-
-                    # find matching columns
-                    search_keys = []
-                    if self.use_preset:
-                        search_keys += self.pii()
-                    if self.like_search:
-                        search_keys += self.like_search
-                    matched = [col for col in columns if any(key in col["column_name"].lower() for key in search_keys)]
-                    if matched:
-                        column_str = ", ".join(f"[{c['column_name']}]" for c in matched)
-                        context.log.success(f"Match in {db_name}.{table_name} => Columns: {column_str}")
-                        data = connection.conn.sql_query(f"SELECT {column_str} FROM [{table_name}]")
-                        for row in data:
-                            decoded_data = {k: (v.decode("utf-8", "replace").strip() if isinstance(v, bytes) else str(v).strip()) for k, v in row.items()}
-                            if self.show_data:
-                                context.log.highlight(f"{db_name}.{table_name} => " + ", ".join(f"{k}: {v}" for k, v in decoded_data.items()))
-                            all_results.append({
-                                "type": "column_match",
-                                "database": db_name,
-                                "table": table_name,
-                                "row": {k: v.strip() for k, v in decoded_data.items()}
-                            })
-
-                except Exception as e:
-                    context.log.fail(f"Failed to inspect table {table_name} in {db_name}: {e}")
-
-                # If regex patterns are provided, scan all cell values in the table for matches
-                if self.regex_patterns:
+                for table in tables:
+                    table_name = table.get("table_name", "")
                     try:
-                        full_data = connection.conn.sql_query(f"SELECT * FROM [{table_name}]")
-                        for row in full_data:
-                            matched_cells = {}
-                            for col, val in row.items():
-                                val_str = val.decode("utf-8", "replace").strip() if isinstance(val, bytes) else str(val).strip()
+                        columns = connection.conn.sql_query(f"SELECT column_name FROM information_schema.columns WHERE table_name = '{quote_literal(table_name)}'")
 
-                                # Check if any of the cells in the row match any of the regex patterns
-                                for pattern in self.regex_patterns:
-                                    if pattern.search(val_str):
-                                        matched_cells[col] = val_str
-                                        break
-
-                            if matched_cells:
-                                match_str = ", ".join(f"{k}: {v}" for k, v in matched_cells.items())
+                        # find matching columns
+                        search_keys = []
+                        if self.use_preset:
+                            search_keys += self.pii()
+                        if self.like_search:
+                            search_keys += self.like_search
+                        matched = [col for col in columns if any(key in col["column_name"].lower() for key in search_keys)]
+                        if matched:
+                            column_str = ", ".join(quote_ident(c["column_name"]) for c in matched)
+                            context.log.success(f"Match in {db_name}.{table_name} => Columns: {column_str}")
+                            data = connection.conn.sql_query(f"SELECT {column_str} FROM {quote_ident(table_name)}")
+                            for row in data:
+                                decoded_data = {k: (v.decode("utf-8", "replace").strip() if isinstance(v, bytes) else str(v).strip()) for k, v in row.items()}
                                 if self.show_data:
-                                    context.log.highlight(f"{db_name}.{table_name} => Regex Match => {match_str}")
+                                    context.log.highlight(f"{db_name}.{table_name} => " + ", ".join(f"{k}: {v}" for k, v in decoded_data.items()))
                                 all_results.append({
-                                    "type": "regex_match",
+                                    "type": "column_match",
                                     "database": db_name,
                                     "table": table_name,
-                                    "matched_cells": matched_cells
+                                    "row": {k: v.strip() for k, v in decoded_data.items()}
                                 })
+
                     except Exception as e:
-                        context.log.fail(f"Regex scan failed for {db_name}.{table_name}: {e}")
+                        context.log.fail(f"Failed to inspect table {table_name} in {db_name}: {e}")
+
+                    # If regex patterns are provided, scan all cell values in the table for matches
+                    if self.regex_patterns:
+                        try:
+                            full_data = connection.conn.sql_query(f"SELECT * FROM {quote_ident(table_name)}")
+                            for row in full_data:
+                                matched_cells = {}
+                                for col, val in row.items():
+                                    val_str = val.decode("utf-8", "replace").strip() if isinstance(val, bytes) else str(val).strip()
+
+                                    # Check if any of the cells in the row match any of the regex patterns
+                                    for pattern in self.regex_patterns:
+                                        if pattern.search(val_str):
+                                            matched_cells[col] = val_str
+                                            break
+
+                                if matched_cells:
+                                    match_str = ", ".join(f"{k}: {v}" for k, v in matched_cells.items())
+                                    if self.show_data:
+                                        context.log.highlight(f"{db_name}.{table_name} => Regex Match => {match_str}")
+                                    all_results.append({
+                                        "type": "regex_match",
+                                        "database": db_name,
+                                        "table": table_name,
+                                        "matched_cells": matched_cells
+                                    })
+                        except Exception as e:
+                            context.log.fail(f"Regex scan failed for {db_name}.{table_name}: {e}")
+            except Exception as e:
+                context.log.fail(f"Failed to search database {db_name}: {e}")
+                continue
 
         if self.save and all_results:
             filename = f"{connection.hostname}_{connection.host}_{datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S')}.json"

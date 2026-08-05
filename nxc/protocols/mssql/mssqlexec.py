@@ -16,7 +16,9 @@ class MSSQLEXEC:
         self.backup_and_enable("xp_cmdshell")
 
         try:
-            cmd = f"exec master..xp_cmdshell '{command}'"
+            # Escape the SQL single-quote layer so the command cannot break out of the xp_cmdshell string literal
+            escaped_command = command.replace("'", "''")
+            cmd = f"exec master..xp_cmdshell '{escaped_command}'"
             self.logger.debug(f"Attempting to execute query: {cmd}")
             raw = self.mssql_conn.sql_query(cmd)
             self.logger.debug(f"Raw results from query: {raw}")

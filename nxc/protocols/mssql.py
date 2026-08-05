@@ -1,4 +1,5 @@
 import os
+import re
 import random
 import contextlib
 from termcolor import colored
@@ -31,6 +32,17 @@ from impacket.tds import (
     TDS_ENCRYPT_OFF
 )
 from impacket.examples.secretsdump import LocalOperations, LSASecrets, SAMHashes
+
+
+def quote_icacls_principal(username):
+    """Safely quote a Windows account name for use in an icacls command executed via xp_cmdshell.
+
+    Strips characters that are not valid in a Windows principal (which would otherwise allow
+    OS command injection through cmd.exe) and wraps the result in double quotes so that the
+    name and its permission spec are passed to icacls as a single argument.
+    """
+    sanitized = re.sub(r"[^A-Za-z0-9 ._\\@$-]", "", username)
+    return f'"{sanitized}"'
 
 
 class mssql(connection):
@@ -561,7 +573,8 @@ class mssql(connection):
         system_storename = gen_random_string(6)
         dump_command = f"reg save HKLM\\SAM C:\\windows\\temp\\{sam_storename} && reg save HKLM\\SYSTEM C:\\windows\\temp\\{system_storename}"
         clean_command = f"del C:\\windows\\temp\\{sam_storename} && del C:\\windows\\temp\\{system_storename}"
-        get_owner_command = f"icacls C:\\windows\\temp\\{sam_storename} /grant {self.username}:F && icacls C:\\windows\\temp\\{system_storename} /grant {self.username}:F"
+        principal = quote_icacls_principal(self.username)
+        get_owner_command = f"icacls C:\\windows\\temp\\{sam_storename} /grant {principal}:F && icacls C:\\windows\\temp\\{system_storename} /grant {principal}:F"
         output_filename = self.output_file_template.format(output_folder="sam")
         try:
             exec_method = MSSQLEXEC(self.conn, self.logger)
@@ -596,7 +609,8 @@ class mssql(connection):
         system_storename = gen_random_string(6)
         dump_command = f"reg save HKLM\\SECURITY C:\\windows\\temp\\{security_storename} && reg save HKLM\\SYSTEM C:\\windows\\temp\\{system_storename}"
         clean_command = f"del C:\\windows\\temp\\{security_storename} && del C:\\windows\\temp\\{system_storename}"
-        get_owner_command = f"icacls C:\\windows\\temp\\{security_storename} /grant {self.username}:F && icacls C:\\windows\\temp\\{system_storename} /grant {self.username}:F"
+        principal = quote_icacls_principal(self.username)
+        get_owner_command = f"icacls C:\\windows\\temp\\{security_storename} /grant {principal}:F && icacls C:\\windows\\temp\\{system_storename} /grant {principal}:F"
         output_filename = self.output_file_template.format(output_folder="lsa")
         try:
             exec_method = MSSQLEXEC(self.conn, self.logger)
