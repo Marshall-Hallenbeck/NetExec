@@ -33,9 +33,9 @@ class ftp(connection):
         self.logger.display(f"Banner: {self.remote_version}")
 
     def create_conn_obj(self):
-        self.conn = FTP()
+        self.conn = FTP(timeout=self.args.ftp_timeout)
         try:
-            self.conn.connect(host=self.host, port=self.port)
+            self.conn.connect(host=self.host, port=self.port, timeout=self.args.ftp_timeout)
         except Exception as e:
             self.logger.debug(f"Error connecting to FTP host: {e}")
             return False
@@ -128,7 +128,7 @@ class ftp(connection):
             # Check if the file exists
             self.conn.size(filename)
             # Attempt to download the file
-            self.conn.retrbinary(f"RETR {filename}", open(downloaded_file, "wb").write)  # noqa: SIM115
+            self.conn.retrbinary(f"RETR {filename}", open(downloaded_file, "wb").write)  # ruff: ignore[open-file-with-context-handler]
         except error_perm as error_message:
             self.logger.fail(f"Failed to download the file. Response: ({error_message})")
             self.conn.close()
@@ -146,7 +146,7 @@ class ftp(connection):
     def put_file(self, local_file, remote_file):
         try:
             # Attempt to upload the file
-            self.conn.storbinary(f"STOR {remote_file}", open(local_file, "rb"))  # noqa: SIM115
+            self.conn.storbinary(f"STOR {remote_file}", open(local_file, "rb"))  # ruff: ignore[open-file-with-context-handler]
         except error_perm as error_message:
             self.logger.fail(f"Failed to upload file. Response: ({error_message})")
             return False

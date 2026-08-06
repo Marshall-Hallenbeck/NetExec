@@ -4,6 +4,7 @@ from nxc.helpers.args import DisplayDefaultsNotNone
 def proto_args(parser, parents):
     ftp_parser = parser.add_parser("ftp", help="own stuff using FTP", parents=parents, formatter_class=DisplayDefaultsNotNone)
     ftp_parser.add_argument("--port", type=int, default=21, help="FTP port")
+    ftp_parser.add_argument("--ftp-timeout", dest="ftp_timeout", type=int, default=10, help="FTP connection timeout in seconds")
 
     cgroup = ftp_parser.add_argument_group("File Operations")
     cgroup.add_argument("--ls", metavar="DIRECTORY", nargs="?", const=".", help="List all files (including hidden) in the directory")

@@ -45,6 +45,8 @@ class mssql(connection):
         self.nthash = ""
         self.no_ntlm = False
         self.encryption = False  # Set during preLogin(); default here so print_host_info() is safe on preLogin failure
+        self.edition = None  # Set during enum_host_info(); defaulted so print_host_info() survives a partial/failed enum
+        self.version = None
 
         connection.__init__(self, args, db, host)
 
