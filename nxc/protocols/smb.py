@@ -1256,7 +1256,14 @@ class smb(connection):
                     self.logger.error("Could not get process list")
                     return
 
-                pidList = [i["UniqueProcessId"] for i in res if i["ImageName"].lower() == self.args.taskkill.lower()]
+                # A record may omit ImageName (impacket #1816); read it defensively.
+                def field(rec, key, default=""):
+                    try:
+                        return rec[key]
+                    except KeyError:
+                        return default
+
+                pidList = [i["UniqueProcessId"] for i in res if field(i, "ImageName").lower() == self.args.taskkill.lower()]
                 if not pidList:
                     self.logger.fail(f"Could not find process named {self.args.taskkill}")
                     return
@@ -1369,14 +1376,23 @@ class smb(connection):
 
     @requires_admin
     def tasklist(self):
-        # Formats a row to be printed on screen
+        # Some process records from hRpcWinStationGetAllProcesses omit fields such as
+        # ImageName (impacket #1816); read defensively so one record cannot crash the listing.
+        def field(rec, key, default=""):
+            try:
+                return rec[key]
+            except KeyError:
+                return default
+
+        # Formats a row to be printed on screen. Coerce to plain str/int: process
+        # fields are impacket NDR values whose __format__ can reject width/grouping specs.
         def format_row(procInfo):
             return template.format(
-                procInfo["ImageName"],
-                procInfo["UniqueProcessId"],
-                procInfo["SessionId"],
-                procInfo["pSid"],
-                f"{procInfo['WorkingSetSize'] // 1000:,} K",
+                str(field(procInfo, "ImageName")),
+                str(field(procInfo, "UniqueProcessId")),
+                str(field(procInfo, "SessionId")),
+                str(field(procInfo, "pSid")),
+                f"{int(field(procInfo, 'WorkingSetSize', 0) or 0) // 1000:,} K",
             )
 
         try:
@@ -1391,8 +1407,8 @@ class smb(connection):
                 if not res:
                     return
                 self.logger.success("Enumerated processes")
-                maxImageNameLen = max(len(i["ImageName"]) for i in res)
-                maxSidLen = max(len(i["pSid"]) for i in res)
+                maxImageNameLen = max(len(str(field(i, "ImageName"))) for i in res)
+                maxSidLen = max(len(str(field(i, "pSid"))) for i in res)
                 template = f"{{: <{maxImageNameLen}}} {{: <8}} {{: <11}} {{: <{maxSidLen}}} {{: >12}}"
                 self.logger.highlight(template.format("Image Name", "PID", "Session#", "SID", "Mem Usage"))
                 self.logger.highlight(template.replace(": ", ":=").format("", "", "", "", ""))
@@ -1403,7 +1419,7 @@ class smb(connection):
                     # If args.tasklist is not True then a process name was supplied
                     if self.args.tasklist is not True:
                         # So we look for it and print its information if found
-                        if self.args.tasklist.lower() in procInfo["ImageName"].lower():
+                        if self.args.tasklist.lower() in str(field(procInfo, "ImageName")).lower():
                             found_task = True
                             self.logger.highlight(format_row(procInfo))
                     # Else, no process was supplied, we print the entire list of remote processes
@@ -2313,7 +2329,7 @@ class smb(connection):
 
         if self.args.pvk is not None:
             try:
-                self.pvkbytes = open(self.args.pvk, "rb").read()  # noqa: SIM115
+                self.pvkbytes = open(self.args.pvk, "rb").read()  # ruff: ignore[open-file-with-context-handler]
                 self.logger.success(f"Loading domain backupkey from {self.args.pvk}")
             except Exception as e:
                 self.logger.fail(str(e))
@@ -2336,7 +2352,7 @@ class smb(connection):
             use_kcache=self.use_kcache,
         )
 
-        self.output_file = open(self.output_file_template.format(output_folder="dpapi"), "w", encoding="utf-8")  # noqa: SIM115
+        self.output_file = open(self.output_file_template.format(output_folder="dpapi"), "w", encoding="utf-8")  # ruff: ignore[open-file-with-context-handler]
 
         conn = upgrade_to_dploot_connection(connection=self.conn, target=target)
         if conn is None:
